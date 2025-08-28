@@ -160,6 +160,159 @@ After training, you can use the eval_policy.py to eval your custom policy， you
 **Note: Reserve the method "update_obs", "get_action", and "reset" for policy execution.**
 
 
+## Submission Instructions
+
+We recommend using our `python_submit.py` script for submission.
+
+> **Note:** To ensure fairness and security, you may only submit after completing or deleting your previous submission.
+>  **Note:** If the submission task has already been evaluated, you will not be able to upload it again.
+
+---
+
+### Prerequisites
+
+1. Download the Python submission script `python_submit.py` from our GitHub repository.
+2. Make sure you are using **Python 3.6 or higher**, and have the **requests** library installed:
+
+```bash
+pip install requests
+```
+
+1. Ensure your network is able to connect to the competition server.
+
+---
+
+### Prepare Your Submission Files
+
+You need to prepare the following three folders in your current working directory and organize them according to the specific structure:
+
+#### 📁 Directory Structure Overview
+
+```
+submission/
+├── checkpoints/
+│   └── last.ckpt                    # Trained model checkpoint file
+├── configs/
+│   └── place_food.yaml              # Task configuration file (must match task name)
+└── custom_policy/
+    ├── deploy_policy.py             # Deployment policy file (required)
+    └── [other files...]             # Other related code files and subdirectories
+```
+
+------
+
+#### `checkpoints` Folder
+
+Contains a `.ckpt` format model checkpoint file. Filename can be arbitrary but should be meaningful.
+
+**Example path:** `./checkpoints/last.ckpt`
+
+------
+
+#### `configs` Folder
+
+Contains YAML format task configuration file. Filename must exactly match the selected task name:
+
+- Task 1 (**place_food**): `./configs/place_food.yaml`
+- Task 2 (**take_photo**): `./configs/take_photo.yaml`
+- Task 3 (**three_robots_stack_cube**): `./configs/three_robots_stack_cube.yaml`
+- Task 4 (**long_pipeline_delivery**): `./configs/long_pipeline_delivery.yaml`
+
+------
+
+#### `custom_policy` Folder
+
+Must contain `deploy_policy.py` as the evaluation system entry point. Can include any number of auxiliary Python files, subdirectories, and modules.
+
+- **Required file:** `./custom_policy/deploy_policy.py`
+- **Optional:** Other Python files, subdirectories, and project structures
+
+------
+
+### Submitting with `python_submit.py`
+
+#### Basic Usage
+
+```bash
+python python_submit.py <submission_id> <api_key> <checkpoint_file> <config_file> <policy_folder>
+```
+
+#### Argument Description
+
+- `submission_id`: Your submission ID (obtain it from the competition platform after creating a new submission)
+- `api_key`: Your API key (obtain it from the competition platform after creating a new submission)
+- `checkpoint_file`: Path to the checkpoint file
+- `config_file`: Path to the config file
+- `policy_folder`: Path to the custom policy folder
+
+**Example:**
+
+```bash
+python python_submit.py sub123 key123 ./checkpoints/last.ckpt ./configs/place_food.yaml ./custom_policy
+```
+
+------
+
+### Execution Steps
+
+When you run the script, it will perform the following steps:
+
+1. **Input Validation**: Check whether all required files and folders exist
+2. **Prepare Submission Structure**: Organize files as required by the competition
+3. **File Packaging**: Compress all files into a zip archive
+4. **Chunked Upload**: Upload the zip file in chunks (supports resume on failure)
+5. **Trigger Evaluation**: Notify the server to start evaluating your submission
+6. **Clean Up**: Delete any temporary files created during submission
+
+------
+
+### Network Configuration
+
+By default, the script connects to the server at:
+
+```python
+# Default backend URL - can be overridden by environment variable
+backend_url = os.environ.get('BACKEND_URL', 'https://mygo.iostream.site')
+```
+
+You can override the backend server address by setting the `BACKEND_URL` environment variable:
+
+```bash
+export BACKEND_URL=https://mygo.iostream.site
+python python_submit.py ...
+```
+
+Make sure to verify whether `BACKEND_URL` has been modified before submitting.
+
+------
+
+### Error Handling
+
+- If any file is missing, the script will stop and report the error
+- If the upload fails due to network issues, it will retry up to **5 times**
+- If the submission has already been evaluated, the upload will be skipped
+- **Resume is supported**: you can rerun the same command to continue an interrupted upload
+
+------
+
+### Frequently Asked Questions
+
+**Q: What should I do if I get a "File not found" error?**
+ A: Check whether the file paths are correct and whether the files actually exist in the specified locations.
+
+**Q: What if the upload is very slow?**
+ A: This is normal for large files. They are uploaded in chunks. If the upload is interrupted, simply rerun the command. Uploaded parts will be skipped.
+
+**Q: How do I get my submission_id and api_key?**
+ A: These can be obtained from the official competition website or platform.
+
+**Q: Can I submit multiple versions with different submission_ids at the same time?**
+ A: No. The script submits one version at a time. Each `submission_id` corresponds to a separate submission.
+
+**Q: I submitted using python_submit.py. How do I submit another one?**
+ A: Refresh the competition platform page.
+
+
 ## (Optional) Camera Configuration
 
 ### Customizing Agent Camera Positions and Angles
