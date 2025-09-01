@@ -1,0 +1,130 @@
+task_name: PlaceCubeInCup
+scene:
+  name: Table
+  primitives:
+    - name: cube
+      builder: mani_skill.utils.building.actors.build_cube
+      params:
+        half_size: 0.02
+        color: [0.7333333333, 0.4549019608, 0.6862745098, 1.]
+        name: cube
+        initial_pose:
+          p: [0.6, 0.55, 0.02]
+      pos:
+        ppos:
+          p: [0.6, 0.55, 0.02]
+        qpos: [0.751475, -5.48322e-06, -4.62414e-06, 0.659761]
+        randp_scale: [0.13, 0.1, 0.]
+        randq_scale: [0., 0., 0., 0.]
+        random_quaternions: [1, 1, 0]
+  assets: 
+    - name: table
+      file_path: assets/scenes/table/table.glb
+      collision:
+        type: box
+        pos:
+          p: [0, 0, 0.45982145]
+          half_size: [3.0225, 1.51125, 0.45982145]
+      pos: 
+        ppos:
+          p: [-0.12, 0., -0.9196429]
+          q: [0., 0., 1.5707963268]
+        randp_scale: [0., 0., 0.]
+        randq_scale: [0., 0., 0., 0.]
+      scale: [4.375, 4.375, 1.75]
+  env:
+    floor_width: 100
+    
+objects:
+  -
+    name: cup
+    file_path: assets/objects/teamug_annotated/teamugobj.obj
+    annotation_path: assets/objects/teamug_annotated/models.json
+    pos:
+      ppos:
+        p: [-0., -0.2, 0.16]
+        q: [0, 0, 0]
+      qpos: [0.7071, 0.7071, 0., 0.]
+      randp_scale: [0.1, 0.1, 0.]
+      randq_scale: [0., 0., 0., 0.]
+    material: 
+      type: sapien.pysapien.physx.PhysxMaterial
+      params:
+        static_friction: 0.3
+        dynamic_friction: 0.2
+        restitution: 0.1
+    visual:
+      filename: assets/objects/teamug_annotated/teamugobj.obj
+      scale: [0.13, 0.13, 0.13]
+    mass_params:
+      mass: 1.2
+      cmass_local_pose: [0., 0., 0.]
+      inertia: [0.01, 0.01, 0.01]
+    collision:
+      type: nonconvex
+      filename: assets/objects/teamug_annotated/teamugobj.obj
+      scale: [0.13, 0.13, 0.13]
+
+agents:
+  -
+    robot_uid: panda-0
+    pos:
+      ppos:
+        p: [0., -0.85, 0.]
+        q: [0., 0., 1.5707963268]
+      qpos: [0., 0.3926990817, 0., -2.3561944902, 0., 2.3561944902, 0.7853981634, 0.04, 0.04]
+      randp_scale: [0., 0., 0.]
+      randq_scale: [0., 0., 0., 0., 0., 0., 0., 0., 0.]
+  -
+    robot_uid: panda-1
+    pos:
+      ppos:
+        p: [0., 0.65, 0.]
+        q: [0., 0., -1.5707963268]
+      qpos: [0., 0.3926990817, 0., -2.3561944902, 0., 2.3561944902, 0.7853981634, 0.04, 0.04]
+      randp_scale: [0., 0., 0.]
+      randq_scale: [0., 0., 0., 0., 0., 0., 0., 0., 0.]
+
+cameras:
+  sensor:
+    - 
+      uid: head_camera_agent0
+      pose:
+        type: pose
+        params: [[0.772949, -0.30927, 0.777164], [0.046255, 0.387148, 0.0194501, -0.920651]]
+      width: 320
+      height: 240
+      fov: 1.5707963268
+      near: 0.1
+      far: 10
+    - 
+      uid: head_camera_agent1
+      pose:
+        type: pose
+        params: [[0.876021, -0.300696, 0.747121], [0.383419, -0.281859, 0.124118, 0.870713]]
+      width: 320
+      height: 240
+      fov: 1.5707963268
+      near: 0.1
+      far: 10
+    - 
+      uid: head_camera_global
+      pose:
+        type: pose
+        params: [[0.584904, -0.0298813, 1.83179], [0.00384915, -0.597643, 0.00286937, 0.801748]]
+      width: 320
+      height: 240
+      fov: 1.1
+      near: 0.1
+      far: 10
+  human_render:
+    - 
+      uid: render_camera
+      pose:
+        type: look_at
+        params: [[0.8, 0.8, 0.6], [0.0, 0.0, 0.1]]
+      width: 1920
+      height: 1080
+      fov: 1
+      near: 0.01
+      far: 10 

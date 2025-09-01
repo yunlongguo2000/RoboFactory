@@ -1,36 +1,55 @@
 from typing import Any, Dict, Tuple
+
 import numpy as np
 import sapien
 import torch
-import json
+import math
 import yaml
+from transforms3d.euler import euler2quat
 
-from mani_skill.agents.robots import Fetch, Panda
 from mani_skill.agents.multi_agent import MultiAgent
+from mani_skill.agents.robots.panda import Panda
 from mani_skill.envs.sapien_env import BaseEnv
-from mani_skill.envs.utils import randomization
+from mani_skill.envs.utils.randomization.pose import random_quaternions
 from mani_skill.sensors.camera import CameraConfig
 from mani_skill.utils import common, sapien_utils
 from mani_skill.utils.building import actors
 from mani_skill.utils.registration import register_env
 from mani_skill.utils.structs.pose import Pose
+from mani_skill.utils.structs.types import GPUMemoryConfig, SimConfig
 import utils.scenes
 
-@register_env("TakePhoto-rf", max_episode_steps=1500)
-class TakePhotoEnv(BaseEnv):
 
+@register_env("FourRobotsStackCube-rf", max_episode_steps=800)
+class FourRobotsStackCubeEnv(BaseEnv):
     SUPPORTED_ROBOTS = [("panda", "panda", "panda", "panda")]
     agent: MultiAgent[Tuple[Panda, Panda, Panda, Panda]]
-    goal_thresh = 0.025
+
+    goal_radius = 0.15
 
     def __init__(
-        self, *args, robot_uids=("panda", "panda", "panda", "panda"), **kwargs
+        self,
+        *args,
+        robot_uids=("panda", "panda", "panda", "panda"),
+        robot_init_qpos_noise=0.02,
+        **kwargs
     ):
+        self.robot_init_qpos_noise = robot_init_qpos_noise
         assert 'config' in kwargs
         with open(kwargs['config'], 'r', encoding='utf-8') as f:
             self.cfg = yaml.load(f.read(), Loader=yaml.FullLoader)
         del kwargs['config']
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
+
+    @property
+    def _default_sim_config(self):
+        return SimConfig(
+            gpu_memory_config=GPUMemoryConfig(
+                found_lost_pairs_capacity=2**25,
+                max_rigid_patch_count=2**19,
+                max_rigid_contact_count=2**21,
+            )
+        )
 
     @property
     def _default_sensor_configs(self):
@@ -67,6 +86,7 @@ class TakePhotoEnv(BaseEnv):
         super()._load_agent(options, init_poses)
 
     def _load_scene(self, options: dict):
+        self.cube_half_size = common.to_tensor([0.02] * 3, device=self.device)
         scene_name = self.cfg['scene']['name']
         scene_builder = getattr(utils.scenes, f'{scene_name}SceneBuilder')
         self.scene_builder = scene_builder(env=self, cfg=self.cfg)
@@ -75,27 +95,55 @@ class TakePhotoEnv(BaseEnv):
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):
             self.scene_builder.initialize(env_idx)
-            # alignment between cube and camera
-            cube_ppose = self.cube.pose.p
-            self.camera.pose.p[:, 0] = cube_ppose[:, 0]
-            self.camera.pose.p[:, 1] = cube_ppose[:, 1]
-            self.camera.set_pose(self.camera.pose)
+
+    @property
+    def agent_0(self) -> Panda:
+        return self.agent.agents[0]
+
+    @property
+    def agent_1(self) -> Panda:
+        return self.agent.agents[1]
+
+    @property
+    def agent_2(self) -> Panda:
+        return self.agent.agents[2]
+
+    @property
+    def agent_3(self) -> Panda:
+        return self.agent.agents[3]
 
     def evaluate(self):
-        camera = getattr(self, 'camera')
-        meat = getattr(self, 'meat')
-        camera_button_pose = camera.pose.p[..., :2]
-        camera_button_pose[..., 0] += 0.035
-        camera_button_pose[..., 1] -= 0.09
-        camera_to_agent_pose = self.agent.agents[3].tcp.pose.p[..., :2] - camera_button_pose
-        camera_hanging = camera.pose.p[..., 2] > self.agent.agents[0].robot.pose.p[0, 2] + 0.20
-        meat_hanging = meat.pose.p[..., 2] > self.agent.agents[0].robot.pose.p[0, 2] + 0.20
-        meat_to_agent_pose = self.agent.agents[2].tcp.pose.p[..., :2] - meat.pose.p[..., :2]
-        print("camera_to_agent_pose: ", camera_to_agent_pose)
-        print("meat_to_agent_pose: ", meat_to_agent_pose)
-        success = torch.all(torch.abs(camera_to_agent_pose) < 0.035, dim=1) and camera_hanging and meat_hanging and meat_to_agent_pose[..., 1] < 0.08
+        pos_A = self.cubeA.pose.p
+        pos_B = self.cubeB.pose.p
+        offset =  pos_B - pos_A
+        xy_flag = (
+            torch.linalg.norm(offset[..., :2], axis=1)
+            <= torch.linalg.norm(self.cube_half_size[:2]) + 0.005
+        )
+        z_flag = torch.abs(offset[..., 2] - self.cube_half_size[..., 2] * 2) <= 0.005
+        is_cubeB_on_cubeA = torch.logical_and(xy_flag, z_flag)
+
+        cubeB_to_goal_dist = torch.linalg.norm(
+            self.cubeB.pose.p[:, :2] - self.goal_region.pose.p[..., :2], axis=1
+        )
+        cubeB_placed = cubeB_to_goal_dist < self.goal_radius
+        
+        is_cubeA_grasped_1 = self.agent_0.is_grasping(self.cubeA)
+        is_cubeB_grasped_1 = self.agent_1.is_grasping(self.cubeB)
+        is_cubeA_grasped_2 = self.agent_2.is_grasping(self.cubeA)
+        is_cubeB_grasped_2 = self.agent_3.is_grasping(self.cubeB)
+
+        success = (
+            is_cubeB_on_cubeA * cubeB_placed * (~is_cubeA_grasped_1) * (~is_cubeB_grasped_1) * (~is_cubeA_grasped_2) * (~is_cubeB_grasped_2)
+        )
         return {
-            "success": success,
+            "is_cubeA_grasped_1": is_cubeA_grasped_1,
+            "is_cubeB_grasped_1": is_cubeB_grasped_1,
+            "is_cubeA_grasped_2": is_cubeA_grasped_2,
+            "is_cubeB_grasped_2": is_cubeB_grasped_2,
+            "is_cubeA_on_cubeB": is_cubeB_on_cubeA,
+            "cubeB_placed": cubeB_placed,
+            "success": success.bool(),
         }
 
     def _get_obs_extra(self, info: Dict):
@@ -105,5 +153,4 @@ class TakePhotoEnv(BaseEnv):
         return {}
 
     def compute_normalized_dense_reward(self, obs: Any, action: torch.Tensor, info: Dict):
-        return []
-    
+        return {}

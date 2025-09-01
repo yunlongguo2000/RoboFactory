@@ -1,11 +1,11 @@
 from typing import Any, Dict, Tuple
+
 import numpy as np
 import sapien
 import torch
-import json
 import yaml
 
-from mani_skill.agents.robots import Fetch, Panda
+from mani_skill.agents.robots import Panda
 from mani_skill.agents.multi_agent import MultiAgent
 from mani_skill.envs.sapien_env import BaseEnv
 from mani_skill.envs.utils import randomization
@@ -14,23 +14,35 @@ from mani_skill.utils import common, sapien_utils
 from mani_skill.utils.building import actors
 from mani_skill.utils.registration import register_env
 from mani_skill.utils.structs.pose import Pose
+from mani_skill.utils.structs.types import GPUMemoryConfig, SimConfig
 import utils.scenes
 
-@register_env("TakePhoto-rf", max_episode_steps=1500)
-class TakePhotoEnv(BaseEnv):
+@register_env("ThreeRobotsPlaceShoes-rf", max_episode_steps=1200)
+class ThreeRobotsPlaceShoesEnv(BaseEnv):
 
-    SUPPORTED_ROBOTS = [("panda", "panda", "panda", "panda")]
-    agent: MultiAgent[Tuple[Panda, Panda, Panda, Panda]]
+    SUPPORTED_ROBOTS = [("panda", "panda", "panda")]
+    agent: MultiAgent[Tuple[Panda, Panda, Panda]]
     goal_thresh = 0.025
+    box_goal_radius = 0.15
 
     def __init__(
-        self, *args, robot_uids=("panda", "panda", "panda", "panda"), **kwargs
+        self, *args, robot_uids=("panda", "panda", "panda"), **kwargs
     ):
         assert 'config' in kwargs
         with open(kwargs['config'], 'r', encoding='utf-8') as f:
             self.cfg = yaml.load(f.read(), Loader=yaml.FullLoader)
         del kwargs['config']
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
+
+    @property
+    def _default_sim_config(self):
+        return SimConfig(
+            gpu_memory_config=GPUMemoryConfig(
+                found_lost_pairs_capacity=2**25,
+                max_rigid_patch_count=2**19,
+                max_rigid_contact_count=2**21,
+            )
+        )
 
     @property
     def _default_sensor_configs(self):
@@ -74,29 +86,67 @@ class TakePhotoEnv(BaseEnv):
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):
+            self.shoe_box.set_qpos(np.array(self.cfg['objects'][2]['qpos']))
             self.scene_builder.initialize(env_idx)
-            # alignment between cube and camera
-            cube_ppose = self.cube.pose.p
-            self.camera.pose.p[:, 0] = cube_ppose[:, 0]
-            self.camera.pose.p[:, 1] = cube_ppose[:, 1]
-            self.camera.set_pose(self.camera.pose)
+
+    @property
+    def left_agent(self) -> Panda:
+        return self.agent.agents[0]
+
+    @property
+    def right_agent(self) -> Panda:
+        return self.agent.agents[1]
+
+    @property
+    def back_agent(self) -> Panda:
+        return self.agent.agents[2]
 
     def evaluate(self):
-        camera = getattr(self, 'camera')
-        meat = getattr(self, 'meat')
-        camera_button_pose = camera.pose.p[..., :2]
-        camera_button_pose[..., 0] += 0.035
-        camera_button_pose[..., 1] -= 0.09
-        camera_to_agent_pose = self.agent.agents[3].tcp.pose.p[..., :2] - camera_button_pose
-        camera_hanging = camera.pose.p[..., 2] > self.agent.agents[0].robot.pose.p[0, 2] + 0.20
-        meat_hanging = meat.pose.p[..., 2] > self.agent.agents[0].robot.pose.p[0, 2] + 0.20
-        meat_to_agent_pose = self.agent.agents[2].tcp.pose.p[..., :2] - meat.pose.p[..., :2]
-        print("camera_to_agent_pose: ", camera_to_agent_pose)
-        print("meat_to_agent_pose: ", meat_to_agent_pose)
-        success = torch.all(torch.abs(camera_to_agent_pose) < 0.035, dim=1) and camera_hanging and meat_hanging and meat_to_agent_pose[..., 1] < 0.08
+        # Check if shoes are inside the box
+        shoe_left_in_box = self._check_shoe_in_box(self.shoe_left, self.shoe_box)
+        shoe_right_in_box = self._check_shoe_in_box(self.shoe_right, self.shoe_box)
+        
+        # Check if shoes are still grasped
+        is_shoe_left_grasped = self.left_agent.is_grasping(self.shoe_left)
+        is_shoe_right_grasped = self.right_agent.is_grasping(self.shoe_right)
+
+        lid_on_box = torch.tensor(self.shoe_box.qpos[0][2] < 0.01)  # Placeholder for lid check
+
+        success = (
+            shoe_left_in_box * 
+            shoe_right_in_box * 
+            lid_on_box * 
+            (~is_shoe_left_grasped) * 
+            (~is_shoe_right_grasped)
+        )
+        
         return {
-            "success": success,
+            "shoe_left_in_box": shoe_left_in_box,
+            "shoe_right_in_box": shoe_right_in_box,
+            "lid_on_box": lid_on_box,
+            "is_shoe_left_grasped": is_shoe_left_grasped,
+            "is_shoe_right_grasped": is_shoe_right_grasped,
+            "success": success.bool(),
         }
+
+    def _check_shoe_in_box(self, shoe, box):
+        """Check if the shoe is inside the box."""
+        shoe_pos = shoe.pose.p
+        box_pos = box.pose.p
+
+        distance = torch.linalg.norm(shoe_pos[:, :2] - box_pos[:, :2], axis=1)
+        in_box = (distance < 0.14) & (shoe_pos[:, 2] < 0.08)
+        return in_box
+
+    def _check_lid_on_box(self, lid, box):
+        """Check if the lid is on top of the box."""
+        lid_pos = lid.pose.p
+        box_pos = box.pose.p
+        
+        distance = torch.linalg.norm(lid_pos[:, :2] - box_pos[:, :2], axis=1)
+        height_diff = lid_pos[:, 2] - box_pos[:, 2]
+        lid_on_box = (distance < 0.05) & (height_diff > 0.12) & (height_diff < 0.18)
+        return lid_on_box
 
     def _get_obs_extra(self, info: Dict):
         return {}
@@ -105,5 +155,4 @@ class TakePhotoEnv(BaseEnv):
         return {}
 
     def compute_normalized_dense_reward(self, obs: Any, action: torch.Tensor, info: Dict):
-        return []
-    
+        return {}

@@ -6,7 +6,12 @@ This track focuses on low-level policy execution in physically realistic simulat
 
 Each task is an episode where agents interact with dynamic objects in a shared workspace under partial observability and randomized conditions. The core challenge lies in achieving robust, learned coordination across multiple agents.
 
+## Update
+- **2025.09.01**: Official Round begins — Please re-download the latest asset files. Official tasks: **`four_robots_stack_cube`**, **`place_cube_in_cup`**, **`strike_cube_hard`**, **`three_robots_place_shoes`** 
+- **2025.08.18**: Warm-up Round begins  
 
+> **Note**  
+> Participants who need to submit model results, please fill out  [this form](https://forms.gle/2dPYe3rKXHc8bk3Y8) to receive submission details.
 
 ## 🗓️ Competition Timeline
 
@@ -14,7 +19,7 @@ Each task is an episode where agents interact with dynamic objects in a shared w
 |-----------------|-------------------|-----------------------------------------------------------------------------|
 | August 18th     | Warmup Round      | Environment opens for teams to explore and get familiar (no prizes).        |
 | September 1st   | Official Round    | Competition begins with unseen tasks and prize challenges.                  |
-| late October (TBD)  | Official Round Ends | Expected closing of the official round.                                    |
+| October 31th  | Official Round Ends | Expected closing of the official round.                                    |
 | December        | Award Ceremony    | Final results and awards will be announced.                                 |
 
 ## Installation
@@ -82,6 +87,12 @@ Then you can check the environment by running the code in next section (Data Gen
 - `place_food`
 - `take_photo`
 - `three_robots_stack_cube`
+
+**Available Tasks for Official Round:**
+- `four_robots_stack_cube`
+- `strike_cube_hard`
+- `three_robots_place_shoes`
+- `place_cube_in_cup`
 
 You can use the following command to run the tasks using the expert policy solution
 
@@ -213,10 +224,12 @@ Contains a `.ckpt` format model checkpoint file. Filename can be arbitrary but s
 
 Contains YAML format task configuration file. Filename must exactly match the selected task name:
 
-- Task 1 (**place_food**): `./configs/place_food.yaml`
-- Task 2 (**take_photo**): `./configs/take_photo.yaml`
-- Task 3 (**three_robots_stack_cube**): `./configs/three_robots_stack_cube.yaml`
-- Task 4 (**long_pipeline_delivery**): `./configs/long_pipeline_delivery.yaml`
+- Task 1 (**four_robots_stack_cube**): `./configs/four_robots_stack_cube.yaml`
+- Task 2 (**strike_cube_hard**): `./configs/strike_cube_hard.yaml`
+- Task 3 (**three_robots_place_shoes**): `./configs/three_robots_place_shoes.yaml`
+- Task 4 (**place_cube_in_cup**): `./configs/place_cube_in_cup.yaml`
+
+
 
 ------
 
@@ -384,4 +397,4 @@ python script/run_task.py configs/table/[task name].yaml
 
 ## Contact
 
-If you have any questions, feel free to email us on <icmlmarschallenge@gmail.com>.
+If you have any questions, feel free to email us on <marschallenge2025@gmail.com>.

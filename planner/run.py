@@ -11,15 +11,17 @@ import os.path as osp
 from mani_skill.utils.wrappers.record import RecordEpisode
 from utils.wrappers.record import RecordEpisodeMA
 from mani_skill.trajectory.merge_trajectory import merge_trajectories
-from .solutions import solvePlaceFood
-from .solutions import solveThreeRobotsStackCube
-from .solutions import solveTakePhoto, solveLongPipelineDelivery
+from .solutions import *
 import math
 MP_SOLUTIONS = {
     "PlaceFood-rf": solvePlaceFood,
     "ThreeRobotsStackCube-rf": solveThreeRobotsStackCube,
     "TakePhoto-rf": solveTakePhoto,
     "LongPipelineDelivery-rf": solveLongPipelineDelivery,
+    "StrikeCubeHard-rf": solveStrikeCubeHard,
+    "ThreeRobotsPlaceShoes-rf": solveThreeRobotsPlaceShoes,
+    "FourRobotsStackCube-rf": solveFourRobotsStackCube,
+    "PlaceCubeInCup-rf": solvePlaceCubeInCup,
 }
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
