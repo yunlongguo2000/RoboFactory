@@ -22,6 +22,7 @@ conda activate RoboFactory
 cd RoboFactory
 pip install -r requirements.txt
 # (optional): conda install -c conda-forge networkx=2.5
+pip install -e .
 ```
 Then download the 3D assets in RoboFactory task:
 ```bash
@@ -49,6 +50,26 @@ Run the following commands to install the necessary runtime libraries:
 sudo apt update
 sudo apt install libgl1 libglvnd0 libegl1-mesa libgles2-mesa libopengl0
 ```
+
+### 🔧 Troubleshooting
+
+**SOCKS Proxy Error**
+
+If you encounter `ImportError: Using SOCKS proxy, but the 'socksio' package is not installed` when downloading assets or datasets, install the missing dependency:
+
+```bash
+pip install httpx[socks]
+```
+
+**Visualization on Remote Server (X11 Forwarding)**
+
+If you want to use `--vis` to open a visualization window on a remote server, you need an X11 server on your local machine:
+
+- **Windows**: Use [MobaXterm](https://mobaxterm.mobatek.net/) — X11 forwarding is enabled by default. Just SSH into the server and run the command normally.
+- **macOS**: Install [XQuartz](https://www.xquartz.org/), then SSH with `ssh -X user@server`.
+- **Linux**: Usually works out of the box with `ssh -X user@server`.
+
+If you don't need visualization (e.g., batch data generation), run without `--vis` and no X11 server is required.
 
 ## 📦Generate Data
 You can use the following script to generate data. The generated data is usually placed in the demos/ folder.
