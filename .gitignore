@@ -8,7 +8,6 @@ robofactory/data
 robofactory/eval_video
 robofactory/checkpoints
 
-docs/
 _ext
 *.pyc
 *.so
